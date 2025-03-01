@@ -1,8 +1,8 @@
 /*
  * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Main.java to edit this template
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
  */
-package chessgame;
+package main;
 import java.util.HashMap;
 import javax.swing.*;
 import java.awt.*;
@@ -71,7 +71,8 @@ public class ChessGame {
     }
 private void startGame() {
         JOptionPane.showMessageDialog(frame, "Starting a new game!");
-        // Implement logic to reset the board
+        SwingUtilities.invokeLater(() -> new Board());
+        frame.dispose();
     }
 
     private void endGame() {
@@ -142,4 +143,3 @@ private void drawPieces(Graphics g) {
     }
 }
 }
-
