@@ -38,8 +38,22 @@ public class perhapsthegui {
         frame.add(panel);
         frame.setVisible(true);
     }
+/*private void launchGame() {
+        JFrame window = new JFrame("Simple Chess");
+        window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        window.setResizable(false);
+        window.setIconImage(Main.logo.getImage());
 
-   public static void main(String[] args) {
-        new perhapsthegui();
-    }
+        GamePanel gp = new GamePanel();
+        window.add(gp);
+        window.pack();
+
+        window.setLocationRelativeTo(null);
+        window.setVisible(true);
+        gp.launchGame(); // Start the actual chess game logic*/
+    //}
 }
+   //public static void main(String[] args) {
+       // new perhapsthegui();
+    //}
+

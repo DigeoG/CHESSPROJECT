@@ -70,11 +70,25 @@ public class ChessGame {
         frame.setVisible(true);
     }
 private void startGame() {
-        JOptionPane.showMessageDialog(frame, "Starting a new game!");
-        SwingUtilities.invokeLater(() -> new Board());
-        frame.dispose();
-    }
-
+   JOptionPane.showMessageDialog(frame, "Starting a new game!");
+    SwingUtilities.invokeLater(() -> {
+        // Create a new GamePanel instance
+        GamePanel gp = new GamePanel();
+        
+        // Create a new window for the game panel
+        JFrame window = new JFrame("Game Panel");
+        window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        window.add(gp); // Add the GamePanel to the window
+        window.pack(); // Pack the window to fit the contents (GamePanel)
+        window.setLocationRelativeTo(null); // Center the window on screen
+        window.setVisible(true); // Make the window visible
+        
+        // Launch the game
+        gp.launchGame();
+    });
+    
+    frame.dispose(); // Close the current ChessGame window
+}
     private void endGame() {
         JOptionPane.showMessageDialog(frame, "Game Over.");
         // Implement end game logic
