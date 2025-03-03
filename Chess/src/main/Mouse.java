@@ -31,3 +31,4 @@ public class Mouse extends MouseInputAdapter {
         y = e.getY();
     }
 }
+
