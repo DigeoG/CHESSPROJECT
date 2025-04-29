@@ -477,6 +477,12 @@ private void showInstructions() {
     JOptionPane.showMessageDialog(this, instructions, "📖 How to Play", JOptionPane.INFORMATION_MESSAGE);
 }
 
+@Override
+protected String getSaveGameModeTag() {
+    return "BATTLE";
+}
+
+
 }
 
 

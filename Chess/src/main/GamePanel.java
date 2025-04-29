@@ -8,14 +8,17 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.util.ArrayList;
 import java.awt.RenderingHints;
-//import com.github.bhlangonijr.chesslib.move.Move;
-//import com.github.bhlangonijr.chesslib.move.MoveGenerator;
-//import com.github.bhlangonijr.chesslib.move.MoveGeneratorException;
-//import com.github.bhlangonijr.chesslib.Square;
 import javax.swing.JPanel;
 import ai.ChessAI;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.List;
+import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import piece.Bishop;
 import piece.King;
 import piece.Knight;
@@ -921,7 +924,8 @@ public void promoting() {
 
 
 @Override
-public void paintComponent(Graphics g) {
+public void paintComponent(Graphics g) 
+{
     super.paintComponent(g);
     Graphics2D g2 = (Graphics2D) g;
 
@@ -1029,4 +1033,109 @@ public void paintComponent(Graphics g) {
         g2.setColor(Color.lightGray);
         g2.drawString("Stalemate", 200, 420);
     }
-}}
+}
+
+
+
+public void saveGame() {
+    JFileChooser fileChooser = new JFileChooser();
+    fileChooser.setDialogTitle("Save Game As...");
+    fileChooser.setFileFilter(new FileNameExtensionFilter("Text Files", "txt"));
+
+    int userSelection = fileChooser.showSaveDialog(this);
+
+    if (userSelection == JFileChooser.APPROVE_OPTION) {
+        try (FileWriter writer = new FileWriter(fileChooser.getSelectedFile() + ".txt")) {
+            writer.write(getSaveGameModeTag() + "\n");  // ✨ First line: Game Mode Tag
+            writer.write(getFEN());
+            JOptionPane.showMessageDialog(this, "💾 Game saved successfully!");
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "⚠️ Failed to save game: " + e.getMessage());
+        }
+    }
+}
+
+
+
+public void loadGame() {
+    JFileChooser fileChooser = new JFileChooser();
+    fileChooser.setDialogTitle("Load Saved Game");
+    fileChooser.setFileFilter(new FileNameExtensionFilter("Text Files", "txt"));
+
+    int userSelection = fileChooser.showOpenDialog(this);
+
+    if (userSelection == JFileChooser.APPROVE_OPTION) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(fileChooser.getSelectedFile()))) {
+            String gameModeTag = reader.readLine();  // ✨ First line is mode
+            String fen = reader.readLine();
+
+            if (!gameModeTag.equals(getSaveGameModeTag())) {
+                    JOptionPane.showMessageDialog(this, 
+                        "⚠️ This save file is from a different game mode: [" + gameModeTag + "]\n" +
+                        "You are currently playing in [" + getSaveGameModeTag() + "] mode.\n\n" +
+                        "Please return to the Main Menu and select the correct mode to load this game.",
+                        "Load Error",
+                        JOptionPane.WARNING_MESSAGE
+                    );
+                return;
+            }
+
+            loadFromFEN(fen);
+            JOptionPane.showMessageDialog(this, "📂 Game loaded successfully!");
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "⚠️ Failed to load game: " + e.getMessage());
+        }
+    }
+}
+
+
+
+public void loadFromFEN(String fen) {
+    pieces.clear();
+
+    String[] parts = fen.split(" ");
+    String boardPart = parts[0];
+    String turnPart = parts[1];
+
+    String[] rows = boardPart.split("/");
+
+    for (int row = 0; row < 8; row++) {
+        String rowString = rows[row];
+        int col = 0;
+        for (char c : rowString.toCharArray()) {
+            if (Character.isDigit(c)) {
+                col += Character.getNumericValue(c); // Empty squares
+            } else {
+                int color = Character.isUpperCase(c) ? WHITE : BLACK;
+                Piece newPiece = createPieceFromFENChar(c, color, col, row);
+                if (newPiece != null) {
+                    pieces.add(newPiece);
+                }
+                col++;
+            }
+        }
+    }
+
+    currentColor = turnPart.equals("w") ? WHITE : BLACK;
+    copyPieces(pieces, simPieces); // Sync board
+    repaint();
+}
+
+private Piece createPieceFromFENChar(char c, int color, int col, int row) {
+    char lower = Character.toLowerCase(c);
+    return switch (lower) {
+        case 'p' -> new Pawn(color, col, row);
+        case 'r' -> new Rook(color, col, row);
+        case 'n' -> new Knight(color, col, row);
+        case 'b' -> new Bishop(color, col, row);
+        case 'q' -> new Queen(color, col, row);
+        case 'k' -> new King(color, col, row);
+        default -> null;
+    };
+}
+protected String getSaveGameModeTag() {
+    return "STANDARD";
+}
+
+
+}
