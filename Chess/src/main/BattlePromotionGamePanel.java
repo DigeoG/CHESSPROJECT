@@ -479,8 +479,9 @@ private void showInstructions() {
 
 @Override
 protected String getSaveGameModeTag() {
-    return "BATTLE";
+    return "BATTLE"; 
 }
+
 
 
 }

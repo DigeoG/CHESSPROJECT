@@ -58,20 +58,28 @@ public class GamePanel extends JPanel implements Runnable {
     boolean stalemate;
     boolean validHumanMoveMade = false;
     public Piece promotingPawn = null;
+    protected final GameMode gameMode;
+
 
 
 
 public GamePanel(boolean againstAI) {
-    this.againstAI = againstAI;
     
-    setPreferredSize(new Dimension(WIDTH, HEIGHT));
-    setBackground(Color.black);
-    addMouseMotionListener(mouse);
-    addMouseListener(mouse);
+    this.againstAI = againstAI;
+    this.gameMode = againstAI ? GameMode.AI : GameMode.STANDARD;
 
-    setPieces();
-    copyPieces(pieces, simPieces);
+        this.pieces = new ArrayList<>();
+        this.simPieces = new ArrayList<>();
+        this.mouse = new Mouse();
 
+        setPreferredSize(new Dimension(WIDTH, HEIGHT));
+        setBackground(Color.black);
+        addMouseMotionListener(mouse);
+        addMouseListener(mouse);
+
+        resetBoard();  // after initialization
+        setPieces();
+        copyPieces(pieces, simPieces);
     if (this.againstAI) {
         System.out.println("AI mode detected! Initializing ChessAI...");
         new Thread(() -> {  // Run ChessAI initialization in a separate thread
@@ -1060,34 +1068,56 @@ public void saveGame() {
 public void loadGame() {
     JFileChooser fileChooser = new JFileChooser();
     fileChooser.setDialogTitle("Load Saved Game");
-    fileChooser.setFileFilter(new FileNameExtensionFilter("Text Files", "txt"));
+    fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Text Files", "txt"));
 
     int userSelection = fileChooser.showOpenDialog(this);
 
     if (userSelection == JFileChooser.APPROVE_OPTION) {
         try (BufferedReader reader = new BufferedReader(new FileReader(fileChooser.getSelectedFile()))) {
-            String gameModeTag = reader.readLine();  // ✨ First line is mode
+            String savedGameModeTag = reader.readLine(); // ✨ First line is mode tag
             String fen = reader.readLine();
 
-            if (!gameModeTag.equals(getSaveGameModeTag())) {
-                    JOptionPane.showMessageDialog(this, 
-                        "⚠️ This save file is from a different game mode: [" + gameModeTag + "]\n" +
-                        "You are currently playing in [" + getSaveGameModeTag() + "] mode.\n\n" +
-                        "Please return to the Main Menu and select the correct mode to load this game.",
-                        "Load Error",
-                        JOptionPane.WARNING_MESSAGE
-                    );
+            GameMode savedMode = GameMode.valueOf(savedGameModeTag);
+
+            if (savedMode != this.gameMode) {
+                JOptionPane.showMessageDialog(this,
+                    "⚠️ This save file is from a different game mode: [" + savedMode + "]\n" +
+                    "You are currently playing in [" + gameMode + "] mode.\n\n" +
+                    "Please return to the Main Menu and select the correct mode to load this game.",
+                    "Load Error",
+                    JOptionPane.WARNING_MESSAGE
+                );
                 return;
             }
 
+            // If modes match, continue loading
             loadFromFEN(fen);
+
+            // If it's AI mode, make sure AI is initialized
+            if (savedMode == GameMode.AI && chessAI == null) {
+                initializeChessAI();
+            }
+
             JOptionPane.showMessageDialog(this, "📂 Game loaded successfully!");
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "⚠️ Failed to load game: " + e.getMessage());
+        } catch (IOException | IllegalArgumentException ex) {
+            JOptionPane.showMessageDialog(this, "⚠️ Failed to load saved game: " + ex.getMessage());
         }
     }
 }
 
+
+
+private void initializeChessAI() {
+    System.out.println("Initializing ChessAI after loading save...");
+    new Thread(() -> {
+        try {
+            chessAI = new ChessAI("C:/Users/David Ozowara/Documents/NetBeansProjects/Chesstt/stockfish-windows-x86-64-avx2.exe");
+            System.out.println("ChessAI successfully initialized after loading save.");
+        } catch (Exception e) {
+            System.out.println("Error initializing ChessAI after loading: " + e.getMessage());
+        }
+    }).start();
+}
 
 
 public void loadFromFEN(String fen) {
@@ -1133,9 +1163,24 @@ private Piece createPieceFromFENChar(char c, int color, int col, int row) {
         default -> null;
     };
 }
+
 protected String getSaveGameModeTag() {
-    return "STANDARD";
+    return gameMode.name();  // STANDARD or AI
 }
+
+public void resetBoard() {
+    pieces.clear();
+    simPieces.clear();
+    activeP = null;
+    promotingPawn = null;
+    promotion = false;
+    gameover = false;
+    stalemate = false;
+    castlingP = null;
+    aiTurnPending = false;
+    repaint();
+}
+
 
 
 }

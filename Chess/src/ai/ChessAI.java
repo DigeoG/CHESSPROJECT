@@ -82,6 +82,12 @@ public class ChessAI {
             e.printStackTrace();
         }
     }
+    
+    public void stop() {
+    // Add logic here to stop the Stockfish process if running
+    System.out.println("ChessAI stopped.");
+}
+
 
     public static void main(String[] args) {
         // Instantiate ChessAI with the path to your Stockfish engine
@@ -97,4 +103,7 @@ public class ChessAI {
         // Close the ChessAI (Stockfish) process
         ai.close();
     }
+    
+    
+    
 }

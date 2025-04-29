@@ -78,7 +78,7 @@ public class MainMenu extends JFrame {
                 gp.loadFromFEN(fen);
                 gp.launchGame();
 
-                dispose(); // Close Main Menu
+               this.dispose(); // Close Main Menu
             } catch (IOException ex) {
                 JOptionPane.showMessageDialog(this, "⚠️ Failed to load saved game: " + ex.getMessage());
             }
@@ -118,7 +118,7 @@ public class MainMenu extends JFrame {
         gameWindow.setVisible(true);
 
         gp.launchGame();
-        dispose(); // close main menu
+        this.dispose(); // close main menu
     }
 
     private void showInstructions(ActionEvent e) {
@@ -158,11 +158,16 @@ public class MainMenu extends JFrame {
         JMenuItem loadGame = new JMenuItem("Load Game");
         JMenuItem exitGame = new JMenuItem("Exit Game");
 
-        returnToMenu.addActionListener(e -> {
-            parentWindow.dispose();
-            MainMenu mainMenu = new MainMenu();
-            mainMenu.setVisible(true);
-        });
+    // ✨ >>> Here replace the old returnToMenu listener with the new version:
+    returnToMenu.addActionListener(e -> {
+        // 🧼 Optional: Clean up AI if exists
+        if (gp instanceof GamePanel gamePanel && gamePanel.chessAI != null) {
+            gamePanel.chessAI.stop(); // <- if you have a stop() method in your ChessAI class
+        }
+
+        parentWindow.dispose(); // closes the game window
+        new MainMenu().setVisible(true); // returns to fresh Main Menu
+    });
 
         saveGame.addActionListener(e -> {
             gp.saveGame();
