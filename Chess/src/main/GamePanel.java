@@ -8,9 +8,14 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.util.ArrayList;
 import java.awt.RenderingHints;
-
+//import com.github.bhlangonijr.chesslib.move.Move;
+//import com.github.bhlangonijr.chesslib.move.MoveGenerator;
+//import com.github.bhlangonijr.chesslib.move.MoveGeneratorException;
+//import com.github.bhlangonijr.chesslib.Square;
 import javax.swing.JPanel;
-
+import ai.ChessAI;
+import java.util.List;
+import javax.swing.SwingUtilities;
 import piece.Bishop;
 import piece.King;
 import piece.Knight;
@@ -39,6 +44,8 @@ public class GamePanel extends JPanel implements Runnable {
     public static final int WHITE = 0;
     public static final int BLACK = 1;
     int currentColor = WHITE;
+    public boolean againstAI;
+    public ChessAI chessAI;
 
     // BOOLEANS
     boolean canMove;
@@ -46,18 +53,38 @@ public class GamePanel extends JPanel implements Runnable {
     boolean promotion;
     boolean gameover;
     boolean stalemate;
+    boolean validHumanMoveMade = false;
+    public Piece promotingPawn = null;
 
-    public GamePanel() {
-        setPreferredSize(new Dimension(WIDTH, HEIGHT));
-        setBackground(Color.black);
-        addMouseMotionListener(mouse);
-        addMouseListener(mouse);
 
-        setPieces();
-        // testPromotion();
-        // testIllegal();
-        copyPieces(pieces, simPieces);
+
+public GamePanel(boolean againstAI) {
+    this.againstAI = againstAI;
+    
+    setPreferredSize(new Dimension(WIDTH, HEIGHT));
+    setBackground(Color.black);
+    addMouseMotionListener(mouse);
+    addMouseListener(mouse);
+
+    setPieces();
+    copyPieces(pieces, simPieces);
+
+    if (this.againstAI) {
+        System.out.println("AI mode detected! Initializing ChessAI...");
+        new Thread(() -> {  // Run ChessAI initialization in a separate thread
+            try {
+                chessAI = new ChessAI( "C:/Users/David Ozowara/Documents/NetBeansProjects/Chesstt/stockfish-windows-x86-64-avx2.exe");
+                System.out.println("ChessAI successfully initialized.");
+            } catch (Exception e) {
+                System.out.println("Error initializing ChessAI: " + e.getMessage());
+            }
+        }).start(); 
+//        "C:/Users/David Ozowara/Documents/NetBeansProjects/Chesstt/stockfish-windows-x86-64-avx2.exe"
+    } else {
+        System.out.println("againstAI is false in GamePanel: ChessAI is not initialized.");
     }
+}
+
 
     public void launchGame() {
         gameThread = new Thread(this);
@@ -131,74 +158,99 @@ public class GamePanel extends JPanel implements Runnable {
             }
         }
     }
+    
+public void update() {
+    if (promotion) {
+        promoting();
+    } else if (!gameover && !stalemate) {
+        
+    if (currentColor == WHITE && againstAI) {
+        isCurrentKingInCheck();
+        
 
-    private void update() {
-
-        if (promotion) {
-            promoting();
-        } else if (gameover == false && stalemate == false) {
-            //// MOUSE BUTTON PRESSED ////
-            if (mouse.pressed) {
-                if (activeP == null) {
-                    // If the activeP is null, check if you can pickup a piece
-                    for (Piece piece : simPieces) {
-                        // If the mouse is on ally piece, pick it up as activeP
-                        if (piece.color == currentColor && piece.col == mouse.x / Board.SQUARE_SIZE
-                                && piece.row == mouse.y / Board.SQUARE_SIZE) {
-                            activeP = piece;
-                        }
-                    }
-                } else {
-                    // If the player is holding a piece, simulate the move
-                    simulate();
-                }
-            }
-
-            //// MOUSE BUTTON RELEASED ////
-            if (mouse.pressed == false) {
-                if (activeP != null) {
-                    if (validSquare) {
-                        // MOVE CONFIRMED
-
-                        // Update the piece list in case being captured
-                        copyPieces(simPieces, pieces);
-                        activeP.updatePosition();
-
-                        if (castlingP != null) {
-                            castlingP.updatePosition();
-                        }
-
-                        if (isKingInCheck() && isCheckMate()) {
-                            // Gameover if checkmate
-                            gameover = true;
-                        } else if (isStalemate() && isKingInCheck() == false) {
-                            stalemate = true;
-                        } else { // The game is continue
-                            if (canPromote()) {
-                                promotion = true;
-                            } else {
-                                changePlayer();
-                            }
-                        }
-
-                        // if (canPromote()) {
-                        // promotion = true;
-                        // } else {
-                        // changePlayer();
-                        // }
-
-                    } else {
-                        // Invalid move, reset the piece
-                        copyPieces(pieces, simPieces);
-                        activeP.resetPosition();
-                        activeP = null;
-                    }
-                }
-            }
+        if (isCheckMate()) {
+            System.out.println("CHECKMATE detected during update()");
+            gameover = true;
+            repaint();
         }
     }
+    
 
-    private void simulate() {
+    
+
+        
+        //// MOUSE PRESSED - pick up piece ////
+        if (mouse.pressed) {
+            if (activeP == null) {
+                for (Piece piece : simPieces) {
+                    if (piece.color == currentColor &&
+                        piece.col == mouse.x / Board.SQUARE_SIZE &&
+                        piece.row == mouse.y / Board.SQUARE_SIZE) {
+                        activeP = piece;
+                    }
+                }
+            } else {
+                // Optional: update preview during drag
+                simulate();
+            }
+        }
+
+        //// MOUSE RELEASED - drop and validate ////
+        if (!mouse.pressed) {
+            if (activeP != null) {
+                if (validSquare) {
+                    validHumanMoveMade = true;
+
+                    copyPieces(simPieces, pieces);
+                    activeP.updatePosition();
+                    System.out.println("Human moved piece to: col = " + activeP.col + ", row = " + activeP.row);
+
+                    if (castlingP != null) {
+                        castlingP.updatePosition();
+                    }
+
+                    if (isKingInCheck() && isCheckMate()) {
+                        gameover = true;
+                    } else if (isStalemate() && !isKingInCheck()) {
+                        stalemate = true;
+                    } else if (canPromote()) {
+                        promotion = true;
+                        promotingPawn = activeP; 
+                    } else {
+                        changePlayer(); // switch to BLACK
+                        repaint();
+
+                        // ⛔️ Delay AI turn until the *next* update() frame
+                        SwingUtilities.invokeLater(() -> aiTurnPending = true);
+
+                    }
+
+                } else {
+                    // Invalid move, reset the piece
+                    System.out.println("Invalid human move attempted: " + activeP.col + "," + activeP.row);
+                    copyPieces(pieces, simPieces);
+                    activeP.resetPosition();
+                    activeP = null;
+                }
+
+                // Always clear piece selection after mouse release
+                activeP = null;
+            }
+        }
+
+        //// AI MOVE (one-time) ////
+    if (validHumanMoveMade && aiTurnPending && !promotion && !gameover && !stalemate) {
+        makeAIMove();
+        aiTurnPending = false;
+        validHumanMoveMade = false; // Reset for next move
+        
+    }
+
+    }
+}
+
+
+    public void simulate() {
         canMove = false;
         validSquare = false;
 
@@ -234,9 +286,10 @@ public class GamePanel extends JPanel implements Runnable {
                 validSquare = true;
             }
         }
+        repaint();
     }
 
-    private boolean isIllegal(Piece king) {
+    public boolean isIllegal(Piece king) {
         if (king.type == Type.KING) {
             for (Piece piece : simPieces) {
                 if (piece != king && piece.color != king.color && piece.canMove(king.col, king.row)) {
@@ -248,7 +301,7 @@ public class GamePanel extends JPanel implements Runnable {
         return false;
     }
 
-    private boolean opponentCanCaptureKing() {
+    public boolean opponentCanCaptureKing() {
         Piece king = getKing(false);
 
         for (Piece piece : simPieces) {
@@ -260,7 +313,7 @@ public class GamePanel extends JPanel implements Runnable {
         return false;
     }
 
-    private boolean isKingInCheck() {
+    public boolean isKingInCheck() {
 
         Piece king = getKing(true);
 
@@ -273,8 +326,41 @@ public class GamePanel extends JPanel implements Runnable {
 
         return false;
     }
+    
+public boolean isCurrentKingInCheck() {
+    
+Piece king = getKing(false); // current player’s king
+for (Piece p : simPieces) {
+    if (p.color != king.color && p.canMove(king.col, king.row)) {
+        checkingP = p;
+        //System.out.println("? King is in check from: " + p.getClass().getSimpleName() + " at " + p.col + "," + p.row);
+        return true;
+    }
+}
+checkingP = null;
+//System.out.println("?? checkingP is null – not in check?");
+return false;
 
-    private Piece getKing(boolean opponent) {
+
+//    Piece king = getKing(false);  // Get the current player's king
+//
+//    for (Piece piece : simPieces) {
+//        if (piece.color != king.color && piece.canMove(king.col, king.row)) {
+//            checkingP = piece;  // 🟥 Set the correct checking piece!
+//            return true;
+//        }
+//    }
+//
+//    checkingP = null;
+//    return false;
+}
+
+
+
+
+
+
+    public Piece getKing(boolean opponent) {
         Piece king = null;
 
         for (Piece piece : simPieces) {
@@ -292,7 +378,10 @@ public class GamePanel extends JPanel implements Runnable {
         return king;
     }
 
-    private boolean isCheckMate() {
+    public boolean isCheckMate() {
+        
+        if (checkingP == null) return false;
+
 
         Piece king = getKing(true);
 
@@ -412,7 +501,7 @@ public class GamePanel extends JPanel implements Runnable {
         return true;
     }
 
-    private boolean kingCanMove(Piece king) {
+    public boolean kingCanMove(Piece king) {
 
         // Simulate if there is a square where the king can move
         if (isValidMove(king, -1, -1)) {
@@ -443,7 +532,7 @@ public class GamePanel extends JPanel implements Runnable {
         return false;
     }
 
-    private boolean isValidMove(Piece king, int colPlus, int rowPlus) {
+    public boolean isValidMove(Piece king, int colPlus, int rowPlus) {
         boolean isValidMove = false;
 
         // Update the temporary King position
@@ -467,7 +556,7 @@ public class GamePanel extends JPanel implements Runnable {
         return isValidMove;
     }
 
-    private boolean isStalemate() {
+    public boolean isStalemate() {
         int count = 0;
 
         // Count the number of pieces
@@ -487,7 +576,7 @@ public class GamePanel extends JPanel implements Runnable {
         return false;
     }
 
-    private void checkCastling() {
+    public void checkCastling() {
         if (castlingP != null) {
             if (castlingP.col == 0) {
                 castlingP.col += 3;
@@ -499,163 +588,445 @@ public class GamePanel extends JPanel implements Runnable {
         }
     }
 
-    private void changePlayer() {
-        if (currentColor == WHITE) {
-            currentColor = BLACK;
+public boolean aiTurnPending = false;  // add this in your class
 
-            // Reset black two stepped status
-            for (Piece piece : pieces) {
-                if (piece.color == BLACK) {
-                    piece.twoStepped = false;
-                }
-            }
-        } else {
-            currentColor = WHITE;
 
-            // Reset white two stepped status
-            for (Piece piece : pieces) {
-                if (piece.color == WHITE) {
-                    piece.twoStepped = false;
-                }
+public void changePlayer() {
+    if (currentColor == WHITE) {
+        currentColor = BLACK;
+
+        for (Piece piece : pieces) {
+            if (piece.color == BLACK) {
+                piece.twoStepped = false;
             }
         }
 
-        activeP = null;
+        if (againstAI) {
+            aiTurnPending = true;  // ✅ trigger AI move in next update
+        }
+
+    } else {
+        currentColor = WHITE;
+
+        for (Piece piece : pieces) {
+            if (piece.color == WHITE) {
+                piece.twoStepped = false;
+            }
+        }
+
+        // No AI trigger here — wait for human
     }
 
-    private boolean canPromote() {
-        if (activeP.type == Type.PAWN) {
-            if (currentColor == WHITE && activeP.row == 0 || currentColor == BLACK && activeP.row == 7) {
-                promoPieces.clear();
-                promoPieces.add(new Rook(currentColor, 9, 2));
-                promoPieces.add(new Knight(currentColor, 9, 3));
-                promoPieces.add(new Bishop(currentColor, 9, 4));
-                promoPieces.add(new Queen(currentColor, 9, 5));
+    activeP = null;
+}
 
-                return true;
-            }
-        }
 
-        return false;
+
+// This is your updated makeAIMove method with the correct order and checkmate detection.
+public void makeAIMove() {
+    if (chessAI == null) {
+        System.out.println("Error: ChessAI is not initialized.");
+        return;
     }
 
-    private void promoting() {
-        if (mouse.pressed) {
-            for (Piece piece : promoPieces) {
-                if (piece.col == mouse.x / Board.SQUARE_SIZE && piece.row == mouse.y / Board.SQUARE_SIZE) {
-                    switch (piece.type) {
-                        case ROOK:
-                            simPieces.add(new Rook(currentColor, activeP.col, activeP.row));
-                            break;
-                        case KNIGHT:
-                            simPieces.add(new Knight(currentColor, activeP.col, activeP.row));
-                            break;
-                        case BISHOP:
-                            simPieces.add(new Bishop(currentColor, activeP.col, activeP.row));
-                            break;
-                        case QUEEN:
-                            simPieces.add(new Queen(currentColor, activeP.col, activeP.row));
-                            break;
-                        default:
-                            break;
-                    }
-                    simPieces.remove(activeP.getIndex());
-                    copyPieces(simPieces, pieces);
-                    activeP = null;
-                    promotion = false;
-                    changePlayer();
-                }
-            }
+    System.out.println("AI is making its move...");
+
+    String fenBeforeMove = getFEN();
+    System.out.println("Sending FEN to AI: " + fenBeforeMove);
+
+    String bestMove = chessAI.getBestMove(fenBeforeMove);
+    System.out.println("Best move received from AI: " + bestMove);
+
+    applyMove(bestMove);
+    System.out.println("Move applied: " + bestMove);
+
+    // Switch to white before updating/checking
+    currentColor = WHITE;
+
+    // Update FEN and board state
+    String fenAfterMove = updateFenAfterMove(fenBeforeMove, bestMove);
+    System.out.println("Updated FEN after AI move: " + fenAfterMove);
+    updateBoardFromFen(fenAfterMove);
+    System.out.println("Board updated from new FEN.");
+
+    // Rebuild simPieces from pieces if needed here
+    copyPieces(pieces, simPieces);
+
+    isCurrentKingInCheck();
+
+    if (checkingP != null) {
+        //System.out.println("CHECK: Human king is in check from " + checkingP.getClass().getSimpleName() +
+         //   " at col = " + checkingP.col + ", row = " + checkingP.row);
+
+        if (isCheckMate()) {
+            System.out.println("\u2705 Checkmate detected after AI move!");
+            gameover = true;
+            repaint();
+            return;
+        }
+    } else {
+        System.out.println("No check after AI move.");
+    }
+}
+
+
+
+
+public Piece getPieceAt(List<Piece> pieceList, int col, int row) {
+    for (Piece piece : pieceList) {
+        if (piece.col == col && piece.row == row) {
+            return piece;
         }
     }
+    return null;
+}
 
-    public void paintComponent(Graphics g) {
-        super.paintComponent(g);
 
-        Graphics2D g2 = (Graphics2D) g;
+public String updateFenAfterMove(String currentFen, String move) {
+    // Convert move like "e2e4" to board indices
+    int fromCol = move.charAt(0) - 'a';
+    int fromRow = 8 - Character.getNumericValue(move.charAt(1));
+    int toCol = move.charAt(2) - 'a';
+    int toRow = 8 - Character.getNumericValue(move.charAt(3));
 
-        // BOARD
-        board.draw(g2);
+    Piece activeP = getPieceAt(fromCol, fromRow);
+    if (activeP == null) {
+        System.out.println("No piece at source square.");
+        return currentFen;
+    }
 
-        // PIECES
-        for (Piece p : simPieces) {
-            p.draw(g2);
-        }
+    // Copy current board to simPieces for testing
+    copyPieces(pieces, simPieces);
+    Piece simulatedPiece = getPieceAt(simPieces, fromCol, fromRow);
+    if (simulatedPiece == null) return currentFen;
 
-        if (activeP != null) {
-            if (canMove) {
-                if (isIllegal(activeP) || opponentCanCaptureKing()) {
-                    g2.setColor(Color.gray);
-                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.7f));
-                    g2.fillRect(activeP.col * Board.SQUARE_SIZE, activeP.row * Board.SQUARE_SIZE, Board.SQUARE_SIZE,
-                            Board.SQUARE_SIZE);
-                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-                } else {
-                    g2.setColor(Color.white);
-                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.7f));
-                    g2.fillRect(activeP.col * Board.SQUARE_SIZE, activeP.row * Board.SQUARE_SIZE, Board.SQUARE_SIZE,
-                            Board.SQUARE_SIZE);
-                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
-                }
-            }
-            // Draw the active piece in the end so it won't be hidden by the board or the
-            // colored square
-            activeP.draw(g2);
-        }
+    // Attempt move
+    simulatedPiece.col = toCol;
+    simulatedPiece.row = toRow;
 
-        // STATUS MESSAGE
-        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        g2.setFont(new Font("Book Antiqua", Font.PLAIN, 40));
-        g2.setColor(Color.white);
+    if (!simulatedPiece.canMove(toCol, toRow) || isIllegal(simulatedPiece)) {
+        System.out.println("Invalid move in FEN update: " + move);
+        return currentFen;
+    }
 
-        if (promotion) {
-            g2.drawString("Promote to:", 840, 150);
-            for (Piece piece : promoPieces) {
-                g2.drawImage(piece.image, piece.getX(piece.col), piece.getY(piece.row), Board.SQUARE_SIZE,
-                        Board.SQUARE_SIZE, null);
-            }
-        } else {
-            if (currentColor == WHITE) {
-                g2.drawString("White's turn", 840, 550);
+    // Valid move, now apply it to the real board
+    copyPieces(simPieces, pieces);
+    Piece realPiece = getPieceAt(fromCol, fromRow);
+    if (realPiece != null) {
+        realPiece.col = toCol;
+        realPiece.row = toRow;
+        realPiece.updatePosition();
+    }
 
-                if (checkingP != null && checkingP.color == BLACK) {
-                    g2.setColor(Color.red);
-                    g2.drawString("The King", 840, 650);
-                    g2.drawString("is in check!", 840, 700);
-                }
+    // Optionally handle promotion/castling if needed
+    // Optionally call changePlayer(); here if you're switching players via FEN update
+
+    System.out.println("Move applied: " + move);
+    return getFEN(); // Your custom FEN builder
+}
+
+ 
+ 
+
+public void updateBoardFromFen(String fen) {
+    System.out.println("Updating board with FEN: " + fen); // Debugging
+    pieces.clear(); // Remove existing pieces
+
+    String[] fenParts = fen.split(" ");
+    String boardState = fenParts[0];
+    String[] rows = boardState.split("/");
+
+    for (int row = 0; row < 8; row++) {
+        String fenRow = rows[row];
+        int col = 0;
+
+        for (int i = 0; i < fenRow.length(); i++) {
+            char c = fenRow.charAt(i);
+
+            if (Character.isDigit(c)) {
+                col += c - '0'; // Empty squares
             } else {
-                g2.drawString("Black's turn", 840, 250);
-
-                if (checkingP != null && checkingP.color == WHITE) {
-                    g2.setColor(Color.red);
-                    g2.drawString("The King", 840, 100);
-                    g2.drawString("is in check!", 840, 150);
-                }
+                Piece piece = createPieceFromFEN(c, row, col);
+                pieces.add(piece);
+                col++;
             }
         }
+    }
 
-        if (gameover) {
-            String s = (currentColor == WHITE) ? "White Wins" : "Black Wins";
+    //repaint(); // Force board redraw
+}
 
-            // Draw semi-transparent black rectangle
-            g2.setColor(new Color(0, 0, 0, 128)); // 128 is the alpha value for 50% opacity
-            g2.fillRect(0, 0, getWidth(), getHeight());
 
-            // Draw text message on top of the semi-transparent background
-            g2.setFont(new Font("Arial", Font.BOLD, 90));
-            g2.setColor(Color.green);
-            g2.drawString(s, 200, 420);
+public Piece createPieceFromFEN(char c, int row, int col) {
+    int color = Character.isLowerCase(c) ? GamePanel.BLACK : GamePanel.WHITE; // Determine color
+    char pieceChar = Character.toUpperCase(c); // Convert to uppercase to match piece types
+
+    // Create the correct piece based on the character
+    switch (pieceChar) {
+        case 'P' -> {
+            return new Pawn(color, col, row);
+            }
+        case 'N' -> {
+            return new Knight(color, col, row);
+            }
+        case 'B' -> {
+            return new Bishop(color, col, row);
+            }
+        case 'R' -> {
+            return new Rook(color, col, row);
+            }
+        case 'Q' -> {
+            return new Queen(color, col, row);
+            }
+        case 'K' -> {
+            return new King(color, col, row);
+            }
+        default -> throw new IllegalArgumentException("Invalid FEN character: " + c);
+    }
+}
+
+
+    
+    public String getFEN() {
+        StringBuilder fen = new StringBuilder();
+        for (int row = 0; row < 8; row++) {
+            int emptyCount = 0;
+            for (int col = 0; col < 8; col++) {
+                Piece piece = getPieceAt(col, row);
+                if (piece == null) {
+                    emptyCount++;
+                } else {
+                    if (emptyCount > 0) {
+                        fen.append(emptyCount);
+                        emptyCount = 0;
+                    }
+                    fen.append(piece.getFENChar());
+                }
+            }
+            if (emptyCount > 0) fen.append(emptyCount);
+            if (row < 7) fen.append("/");
+        }
+        fen.append(" ").append(currentColor == WHITE ? "w" : "b");
+        return fen.toString();
+    }
+        
+        
+ public void applyMove(String bestMove) {
+    if (!bestMove.startsWith("bestmove")) return;
+
+    String[] parts = bestMove.split(" ");
+    if (parts.length < 2) return;  // Ensure move exists
+
+    String move = parts[1];
+    int fromCol = move.charAt(0) - 'a';
+    int fromRow = 8 - (move.charAt(1) - '0');
+    int toCol = move.charAt(2) - 'a';
+    int toRow = 8 - (move.charAt(3) - '0');
+
+    Piece piece = getPieceAt(fromCol, fromRow);
+    if (piece != null) {
+        // Remove captured piece if any
+        Piece capturedPiece = getPieceAt(toCol, toRow);
+        if (capturedPiece != null) {
+            pieces.remove(capturedPiece);
         }
 
-        if (stalemate) {
-            // Draw semi-transparent black rectangle
-            g2.setColor(new Color(0, 0, 0, 128)); // 128 is the alpha value for 50% opacity
-            g2.fillRect(0, 0, getWidth(), getHeight());
+        // Move piece
+        piece.col = toCol;
+        piece.row = toRow;
+        
 
-            // Draw text message on top of the semi-transparent background
-            g2.setFont(new Font("Arial", Font.BOLD, 90));
-            g2.setColor(Color.lightGray);
-            g2.drawString("Stalemate", 200, 420);
+        
+    }
+}
+
+
+    public Piece getPieceAt(int col, int row) {
+        for (Piece piece : pieces) {
+            if (piece.col == col && piece.row == row) {
+                return piece;
+            }
+        }
+        return null;
+    }
+    
+    
+    
+
+
+public boolean canPromote() {
+    if (activeP.type == Type.PAWN) {
+        if ((currentColor == WHITE && activeP.row == 0) ||
+            (currentColor == BLACK && activeP.row == 7)) {
+
+            promoPieces.clear();
+
+            int promoCol = 8;        // right of the board
+            int promoStartRow = 2;   // consistent vertical position
+
+            promoPieces.add(new Rook(currentColor, promoCol, promoStartRow));
+            promoPieces.add(new Knight(currentColor, promoCol, promoStartRow + 1));
+            promoPieces.add(new Bishop(currentColor, promoCol, promoStartRow + 2));
+            promoPieces.add(new Queen(currentColor, promoCol, promoStartRow + 3));
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+public void promoting() {
+    if (promotingPawn == null) {
+        System.out.println("⚠️ promotingPawn is null — skipping promotion.");
+        promotion = false;
+        return;
+    }
+
+    if (mouse.pressed) {
+        for (Piece piece : promoPieces) {
+            if (piece.col == mouse.x / Board.SQUARE_SIZE &&
+                piece.row == mouse.y / Board.SQUARE_SIZE) {
+
+                int promoteCol = promotingPawn.col;
+                int promoteRow = promotingPawn.row;
+
+                switch (piece.type) {
+                    case ROOK:
+                        simPieces.add(new Rook(currentColor, promoteCol, promoteRow));
+                        break;
+                    case KNIGHT:
+                        simPieces.add(new Knight(currentColor, promoteCol, promoteRow));
+                        break;
+                    case BISHOP:
+                        simPieces.add(new Bishop(currentColor, promoteCol, promoteRow));
+                        break;
+                    case QUEEN:
+                        simPieces.add(new Queen(currentColor, promoteCol, promoteRow));
+                        break;
+                }
+
+                simPieces.remove(promotingPawn.getIndex());
+                copyPieces(simPieces, pieces);
+
+                activeP = null;
+                promotingPawn = null; // ✅ Clear promotion context
+                promotion = false;
+                changePlayer();
+            }
         }
     }
 }
+
+
+@Override
+public void paintComponent(Graphics g) {
+    super.paintComponent(g);
+    Graphics2D g2 = (Graphics2D) g;
+
+    // BOARD
+    board.draw(g2);
+
+    // 🔴 Highlight the current player's king if in check
+    if (checkingP != null) {
+        Piece king = getKing(false); // false = current player's king
+        if (king != null) {
+            g2.setColor(new Color(255, 0, 0, 120)); // semi-transparent red
+            g2.fillRect(king.col * Board.SQUARE_SIZE,
+                        king.row * Board.SQUARE_SIZE,
+                        Board.SQUARE_SIZE,
+                        Board.SQUARE_SIZE);
+        }
+    }
+
+    // PIECES
+    for (Piece p : simPieces) {
+        p.draw(g2);
+    }
+    
+    
+
+    // ACTIVE PIECE HIGHLIGHTING
+    if (activeP != null) {
+        if (canMove) {
+            if (isIllegal(activeP) || opponentCanCaptureKing()) {
+                g2.setColor(Color.gray);
+            } else {
+                g2.setColor(Color.white);
+            }
+
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.7f));
+            g2.fillRect(activeP.col * Board.SQUARE_SIZE, activeP.row * Board.SQUARE_SIZE,
+                        Board.SQUARE_SIZE, Board.SQUARE_SIZE);
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+        }
+
+        // Draw active piece on top
+        activeP.draw(g2);
+    }
+
+    // AI TURN INDICATOR
+    if (this.againstAI && currentColor == BLACK) {
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Arial", Font.PLAIN, 30));
+        g2.drawString("AI is thinking...", 450, 350);
+    }
+
+    // TEXT STATUS (Check, Turn, Promotion)
+    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    g2.setFont(new Font("Book Antiqua", Font.PLAIN, 40));
+    g2.setColor(Color.white);
+
+    if (promotion) {
+        g2.drawString("Promote to:", 840, 150);
+        for (Piece piece : promoPieces) {
+            g2.drawImage(piece.image,
+                         piece.getX(piece.col),
+                         piece.getY(piece.row),
+                         Board.SQUARE_SIZE,
+                         Board.SQUARE_SIZE,
+                         null);
+        }
+    } else {
+        if (currentColor == WHITE) {
+            g2.drawString("White's turn", 840, 550);
+
+            if (checkingP != null && checkingP.color == BLACK) {
+                g2.setColor(Color.red);
+                g2.drawString("The King", 840, 650);
+                g2.drawString("is in check!", 840, 700);
+            }
+        } else {
+            g2.drawString("Black's turn", 840, 250);
+
+            if (checkingP != null && checkingP.color == WHITE) {
+                g2.setColor(Color.red);
+                g2.drawString("The King", 840, 100);
+                g2.drawString("is in check!", 840, 150);
+            }
+        }
+    }
+
+    // GAME OVER OVERLAY
+    if (gameover) {
+        String s = (currentColor == WHITE) ? "White Wins" : "Black Wins";
+
+        g2.setColor(new Color(0, 0, 0, 128)); // semi-transparent background
+        g2.fillRect(0, 0, getWidth(), getHeight());
+
+        g2.setFont(new Font("Arial", Font.BOLD, 90));
+        g2.setColor(Color.green);
+        g2.drawString(s, 200, 420);
+    }
+
+    // STALEMATE OVERLAY
+    if (stalemate) {
+        g2.setColor(new Color(0, 0, 0, 128));
+        g2.fillRect(0, 0, getWidth(), getHeight());
+
+        g2.setFont(new Font("Arial", Font.BOLD, 90));
+        g2.setColor(Color.lightGray);
+        g2.drawString("Stalemate", 200, 420);
+    }
+}}

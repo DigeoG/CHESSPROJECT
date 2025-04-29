@@ -5,12 +5,11 @@ import main.Type;
 
 public class Pawn extends Piece {
 
-    // Constructor - Initializes the pawn with color and position
     public Pawn(int color, int col, int row) {
         super(color, col, row);
-        type = Type.PAWN;  // Identify this piece as a pawn
 
-        // Load correct pawn image based on color
+        type = Type.PAWN;
+
         if (color == GamePanel.WHITE) {
             image = getImage("/res/piece/w-pawn");
         } else {
@@ -18,47 +17,48 @@ public class Pawn extends Piece {
         }
     }
 
-    // Override to define pawn-specific movement rules
-    @Override
     public boolean canMove(int targetCol, int targetRow) {
-        if (!isWithinBoard(targetCol, targetRow) || isSameSquare(targetCol, targetRow)) {
-            return false;  // Out of bounds or trying to stay put
-        }
+        if (isWithinBoard(targetCol, targetRow) && isSameSquare(targetCol, targetRow) == false) {
+            // Define move value based on color
+            int moveValue;
 
-        // Movement direction depends on color (white moves up, black moves down)
-        int direction = (color == GamePanel.WHITE) ? -1 : 1;
+            if (color == GamePanel.WHITE) {
+                moveValue = -1;
+            } else {
+                moveValue = 1;
+            }
 
-        // Determine if a piece is on the target square
-        hittingP = getHittingP(targetCol, targetRow);
+            // Check hitting piece
+            hittingP = getHittingP(targetCol, targetRow);
 
-        // 1-square forward move (only allowed if square is empty)
-        if (targetCol == preCol && targetRow == preRow + direction && hittingP == null) {
-            return true;
-        }
+            // 1 square movement
+            if (targetCol == preCol && targetRow == preRow + moveValue && hittingP == null) {
+                return true;
+            }
+            // 2 square movement
+            if (targetCol == preCol && targetRow == preRow + moveValue * 2 && hittingP == null && moved == false
+                    && pieceIsOnStraightLine(targetCol, targetRow) == false) {
+                return true;
+            }
 
-        // 2-square initial move (only allowed if pawn hasn't moved and no obstacles)
-        if (targetCol == preCol && targetRow == preRow + 2 * direction 
-                && !moved && hittingP == null && !pieceIsOnStraightLine(targetCol, targetRow)) {
-            return true;
-        }
+            // Diagonal movement & capture move
+            if (Math.abs(targetCol - preCol) == 1 && targetRow == preRow + moveValue && hittingP != null
+                    && hittingP.color != color) {
+                return true;
+            }
 
-        // Diagonal capture - pawn captures opponent diagonally
-        if (Math.abs(targetCol - preCol) == 1 && targetRow == preRow + direction 
-                && hittingP != null && hittingP.color != color) {
-            return true;
-        }
-
-        // En Passant capture (special pawn rule)
-        if (Math.abs(targetCol - preCol) == 1 && targetRow == preRow + direction) {
-            for (Piece piece : GamePanel.simPieces) {
-                if (piece.col == targetCol && piece.row == preRow && piece.twoStepped) {
-                    hittingP = piece;  // Capture the pawn that just did a two-step move
-                    return true;
+            // En Passant
+            if (Math.abs(targetCol - preCol) == 1 && targetRow == preRow + moveValue) {
+                for (Piece piece : GamePanel.simPieces) {
+                    if (piece.col == targetCol && piece.row == preRow && piece.twoStepped == true) {
+                        hittingP = piece;
+                        return true;
+                    }
                 }
             }
         }
 
-        // If none of the valid pawn moves apply, return false
         return false;
     }
+
 }

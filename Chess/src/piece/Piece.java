@@ -3,177 +3,285 @@ package piece;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+
 import javax.imageio.ImageIO;
 
 import main.Board;
 import main.GamePanel;
 import main.Type;
 
+
 public class Piece {
 
-    // Core attributes for a chess piece
     public Type type;
     public BufferedImage image;
-    public int x, y;           // Pixel coordinates on the board
-    public int col, row;        // Current board position
-    public int preCol, preRow;  // Previous position (for move tracking)
+    public int x, y;
+    public int col, row, preCol, preRow;
     public int color;
-    public Piece hittingP;      // Piece this one is about to capture (if any)
-    public boolean moved;       // True after first move
-    public boolean twoStepped;  // For pawns moving two squares initially
+    public Piece hittingP;
+    public boolean moved, twoStepped;
+    public static final int WHITE = 0;
+    public static final int BLACK = 1;
+
 
     public Piece(int color, int col, int row) {
         this.color = color;
         this.col = col;
         this.row = row;
-        updatePixelCoordinates();
+        x = getX(col);
+        y = getY(row);
 
         preCol = col;
         preRow = row;
     }
 
-    // Load piece image based on provided path
-    public BufferedImage getImage(String imagePath) {
-        try {
-            return ImageIO.read(getClass().getResourceAsStream(imagePath + ".png"));
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
+    public Piece(Piece p) {
+        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
     }
 
-    // Convert board column to x-coordinate
+    public BufferedImage getImage(String imagePath) {
+        BufferedImage image = null;
+
+        try {
+            image = ImageIO.read(getClass().getResourceAsStream(imagePath + ".png"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return image;
+    }
+
     public int getX(int col) {
         return col * Board.SQUARE_SIZE;
     }
 
-    // Convert board row to y-coordinate
     public int getY(int row) {
         return row * Board.SQUARE_SIZE;
     }
 
-    // Convert x-coordinate to board column
     public int getCol(int x) {
         return (x + Board.HALF_SQUARE_SIZE) / Board.SQUARE_SIZE;
     }
 
-    // Convert y-coordinate to board row
     public int getRow(int y) {
         return (y + Board.HALF_SQUARE_SIZE) / Board.SQUARE_SIZE;
     }
 
-    // Find the index of this piece in the global piece list
     public int getIndex() {
-        for (int i = 0; i < GamePanel.simPieces.size(); i++) {
-            if (GamePanel.simPieces.get(i) == this) {
-                return i;
+        for (int index = 0; index < GamePanel.simPieces.size(); index++) {
+            if (GamePanel.simPieces.get(index) == this) {
+                return index;
             }
         }
-        return -1;  // Return -1 if not found (should never happen in normal play)
+
+        return 0;
     }
 
-    // Called after a successful move to update coordinates and state
-    public void updatePosition() {
-        if (type == Type.PAWN && Math.abs(row - preRow) == 2) {
+public void updatePosition() {
+    if (type == Type.PAWN) {
+        if (Math.abs(row - preRow) == 2) {
             twoStepped = true;
         }
-        updatePixelCoordinates();
-        preCol = col;
-        preRow = row;
-        moved = true;
     }
 
-    // Return piece to its last known position (used for illegal move reversals)
+    preCol = col;  // Store previous position before updating
+    preRow = row;
+    
+    x = getX(col);
+    y = getY(row);
+
+    moved = true;
+}
+
+
     public void resetPosition() {
         col = preCol;
         row = preRow;
-        updatePixelCoordinates();
+        x = getX(col);
+        y = getY(row);
     }
 
-    // Base movement check (overridden by specific pieces)
     public boolean canMove(int targetCol, int targetRow) {
         return false;
     }
 
-    // Check if a square is within the bounds of the 8x8 board
     public boolean isWithinBoard(int targetCol, int targetRow) {
-        return targetCol >= 0 && targetCol < 8 && targetRow >= 0 && targetRow < 8;
-    }
-
-    // Check if the target square is the same square the piece is already on
-    public boolean isSameSquare(int targetCol, int targetRow) {
-        return targetCol == preCol && targetRow == preRow;
-    }
-
-    // Find if there’s a piece at the target square (other than self)
-    public Piece getHittingP(int targetCol, int targetRow) {
-        for (Piece piece : GamePanel.simPieces) {
-            if (piece.col == targetCol && piece.row == targetRow && piece != this) {
-                return piece;
-            }
+        if (targetCol >= 0 && targetCol <= 7 && targetRow >= 0 && targetRow <= 7) {
+            return true;
         }
-        return null;
+
+        return false;
     }
 
-    // Is the target square empty or occupied by an enemy?
+    public boolean isSameSquare(int targetCol, int targetRow) {
+        if (targetCol == preCol && targetRow == preRow) {
+            return true;
+        }
+
+        return false;
+    }
+
+public Piece getHittingP(int targetCol, int targetRow) {
+    for (Piece piece : GamePanel.simPieces) {
+        if (piece.col == targetCol && piece.row == targetRow && piece != this) {
+            //System.out.println("Piece at (" + targetCol + ", " + targetRow + ") is blocking.");
+            return piece;
+        }
+    }
+    return null;
+}
+
+
     public boolean isValidSquare(int targetCol, int targetRow) {
         hittingP = getHittingP(targetCol, targetRow);
-        if (hittingP == null) {
-            return true;
-        }
-        if (hittingP.color != this.color) {
-            return true;
-        }
-        hittingP = null;  // Same-color piece blocks the move
-        return false;
-    }
 
-    // Check if a piece blocks the straight path (Rook/Queen logic)
-    public boolean pieceIsOnStraightLine(int targetCol, int targetRow) {
-        if (targetCol != preCol) {
-            // Horizontal movement
-            for (int c = Math.min(preCol, targetCol) + 1; c < Math.max(preCol, targetCol); c++) {
-                if (isPieceAt(c, preRow)) return true;
-            }
-        } else {
-            // Vertical movement
-            for (int r = Math.min(preRow, targetRow) + 1; r < Math.max(preRow, targetRow); r++) {
-                if (isPieceAt(preCol, r)) return true;
+        if (hittingP == null) { // This is a valid square
+            return true;
+        } else { // This is not a valid square
+            if (hittingP.color != this.color) { // If the piece is not the same color
+                return true;
+            } else {
+                hittingP = null;
             }
         }
+
         return false;
     }
 
-    // Check if a piece blocks the diagonal path (Bishop/Queen logic)
-    public boolean pieceIsOnDiagonalLine(int targetCol, int targetRow) {
-        int colStep = (targetCol > preCol) ? 1 : -1;
-        int rowStep = (targetRow > preRow) ? 1 : -1;
-
-        for (int c = preCol + colStep, r = preRow + rowStep; c != targetCol; c += colStep, r += rowStep) {
-            if (isPieceAt(c, r)) return true;
-        }
-        return false;
-    }
-
-    // Helper function to check if any piece exists at a given square
-    private boolean isPieceAt(int col, int row) {
+public boolean pieceIsOnStraightLine(int targetCol, int targetRow) {
+    // Moving left
+    for (int c = preCol - 1; c > targetCol; c--) {
         for (Piece piece : GamePanel.simPieces) {
-            if (piece.col == col && piece.row == row) {
+            if (piece.col == c && piece.row == preRow) {
                 hittingP = piece;
                 return true;
             }
         }
-        return false;
     }
 
-    // Draw the piece image at its current position
+    // Moving right
+    for (int c = preCol + 1; c < targetCol; c++) {
+        for (Piece piece : GamePanel.simPieces) {
+            if (piece.col == c && piece.row == preRow) {
+                hittingP = piece;
+                return true;
+            }
+        }
+    }
+
+    // Moving up
+    for (int r = preRow - 1; r > targetRow; r--) {  // Fixed incorrect loop bound
+        for (Piece piece : GamePanel.simPieces) {
+            if (piece.col == preCol && piece.row == r) {
+                hittingP = piece;
+                return true;
+            }
+        }
+    }
+
+    // Moving down
+    for (int r = preRow + 1; r < targetRow; r++) {  // Fixed incorrect loop bound
+        for (Piece piece : GamePanel.simPieces) {
+            if (piece.col == preCol && piece.row == r) {
+                hittingP = piece;
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
+
+public boolean pieceIsOnDiagonalLine(int targetCol, int targetRow) {
+    int colStep = (targetCol > preCol) ? 1 : -1;
+    int rowStep = (targetRow > preRow) ? 1 : -1;
+
+    int c = preCol + colStep;
+    int r = preRow + rowStep;
+
+    while (c != targetCol && r != targetRow) {
+        for (Piece piece : GamePanel.simPieces) {
+            if (piece.col == c && piece.row == r) {
+                hittingP = piece;
+                return true;
+            }
+        }
+        c += colStep;
+        r += rowStep;
+    }
+
+    return false;
+}
+
+
     public void draw(Graphics2D g2) {
         g2.drawImage(image, x, y, Board.SQUARE_SIZE, Board.SQUARE_SIZE, null);
     }
-
-    // Convenience method to update x/y based on col/row
-    private void updatePixelCoordinates() {
-        x = getX(col);
-        y = getY(row);
+    
+    public String getFENChar() {
+    char fenChar;
+    
+    
+    if (this instanceof Pawn) {
+        fenChar = 'P';
+    } else if (this instanceof Knight) {
+        fenChar = 'N';
+    } else if (this instanceof Bishop) {
+        fenChar = 'B';
+    } else if (this instanceof Rook) {
+        fenChar = 'R';
+    } else if (this instanceof Queen) {
+        fenChar = 'Q';
+    } else if (this instanceof King) {
+        fenChar = 'K';
+    } else {
+        return "?"; // Unknown piece
     }
+    
+    //System.out.println("FEN Char for " + this.getClass().getSimpleName() + ": " + fenChar);
+
+    // Convert to lowercase if the piece is black
+    return (this.color == BLACK) ? String.valueOf(Character.toLowerCase(fenChar)) : String.valueOf(fenChar);
+    
 }
+    
+    public void changeToColor(int newColor) {
+    this.color = newColor;
+
+    // Reload the correct image for the new color and piece type
+    String path = "/pieces/";
+    switch (this.type) {
+        case PAWN:
+            path += (newColor == WHITE) ? "wp" : "bp";
+            break;
+        case ROOK:
+            path += (newColor == WHITE) ? "wr" : "br";
+            break;
+        case KNIGHT:
+            path += (newColor == WHITE) ? "wn" : "bn";
+            break;
+        case BISHOP:
+            path += (newColor == WHITE) ? "wb" : "bb";
+            break;
+        case QUEEN:
+            path += (newColor == WHITE) ? "wq" : "bq";
+            break;
+        case KING:
+            path += (newColor == WHITE) ? "wk" : "bk";
+            break;
+    }
+    this.image = getImage(path); // Reload new correct image
+}
+
+
+}
+
+
+
+
+//some rules dont work 
+//e.g black pawns cant move double step
+// white left rook cant move, 
+// white queen acts as rook etc
+
